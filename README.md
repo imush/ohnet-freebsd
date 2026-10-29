@@ -12,6 +12,11 @@ years airflow did this and shared it in the forum thread
 He stopped in 2025 when he moved away from FreeBSD. Many thanks to him for
 all those years of builds.
 
+**Installing MinimServer on FreeBSD from scratch:** see the guide,
+[MinimServer on FreeBSD](https://imush.github.io/ohnet-freebsd/). It also
+has a service script that starts and stops MinimServer properly on FreeBSD
+(`rc.d/minimserver`).
+
 ## Which zip
 
 MinimServer keeps ohNet in `libext/` as a zip named after its version, for

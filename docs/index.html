@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MinimServer on FreeBSD</title>
+<meta name="description" content="How to install MinimServer on FreeBSD and TrueNAS CORE jails, with a FreeBSD build of its ohNet library.">
+<style>
+:root {
+  --bg: #fdfdfb; --fg: #1f2328; --muted: #59636e; --line: #d8dee4;
+  --code-bg: #f3f4f2; --accent: #0b6e4f; --note-bg: #eef6f2; --warn-bg: #fdf4e3;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15181c; --fg: #e6e9ec; --muted: #9aa4ae; --line: #2e353d;
+    --code-bg: #1e2329; --accent: #5cc8a0; --note-bg: #17271f; --warn-bg: #2b2416;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15181c; --fg: #e6e9ec; --muted: #9aa4ae; --line: #2e353d;
+  --code-bg: #1e2329; --accent: #5cc8a0; --note-bg: #17271f; --warn-bg: #2b2416;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 8px; }
+h2 { font-size: 1.35rem; margin: 40px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+h3 { font-size: 1.05rem; margin: 24px 0 4px; }
+.lede { color: var(--muted); font-size: 1.1rem; margin-top: 0; }
+a { color: var(--accent); }
+code { font: 0.88em/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--code-bg); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
+pre { background: var(--code-bg); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
+pre code { background: none; padding: 0; overflow-wrap: normal; }
+ol.steps > li { margin-bottom: 18px; }
+.note, .warn { padding: 10px 14px; border-radius: 8px; margin: 16px 0; }
+.note { background: var(--note-bg); }
+.warn { background: var(--warn-bg); }
+nav.toc { font-size: 0.95rem; }
+nav.toc ol { padding-left: 20px; margin: 4px 0; }
+footer { margin-top: 48px; color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>MinimServer on FreeBSD</h1>
+<p class="lede">How to run <a href="https://minimserver.com">MinimServer</a>, the UPnP music server, on FreeBSD or in a TrueNAS CORE jail.</p>
+
+<p>MinimServer is Java, so it runs on FreeBSD, all but ohNet, the native UPnP library it uses. MinimServer ships ohNet only for Linux, Windows and macOS. <a href="https://github.com/imush/ohnet-freebsd">ohnet-freebsd</a> builds it for FreeBSD as a drop-in replacement for MinimServer's Linux copy. This page also covers FreeBSD's differences from Linux in MinimServer's start and stop scripts.</p>
+
+<nav class="toc">
+<strong>Contents</strong>
+<ol>
+<li><a href="#need">What you need</a></li>
+<li><a href="#jail">A jail for MinimServer</a></li>
+<li><a href="#install">Installing</a></li>
+<li><a href="#updates">After MinimServer updates</a></li>
+<li><a href="#existing">Moving an existing install to these builds</a></li>
+<li><a href="#trouble">Troubleshooting</a></li>
+</ol>
+</nav>
+
+<h2 id="need">What you need</h2>
+<ul>
+<li><strong>FreeBSD 13.1 or later, on amd64</strong> (64-bit Intel or AMD). A jail works well, including a TrueNAS CORE jail.</li>
+<li><strong>Java.</strong> The <code>openjdk8-jre</code> package is tested. Newer OpenJDK versions also load the library.</li>
+<li><strong>ffmpeg</strong>, optionally, if you'll use MinimStreamer to convert formats.</li>
+</ul>
+<div class="warn"><strong>FreeBSD 13 has no packages anymore.</strong> FreeBSD 13 reached end of life, and its package repositories are gone, so <code>pkg install</code> fails on 13.x. TrueNAS CORE is based on FreeBSD 13, so its jails are 13.x too. A jail that already has Java can be used as it is. For a new jail, Java has to come from somewhere else, such as building it from the ports tree. On FreeBSD 14 and later, packages install normally.</div>
+
+<h2 id="jail">A jail for MinimServer</h2>
+<p>A jail of its own keeps MinimServer apart from the rest of the system. On TrueNAS CORE, create one in the web UI or with <code>iocage</code>. Give it its own network stack (VNET), so that UPnP's multicast discovery reaches it. For example:</p>
+<pre><code>iocage create -n minim -r <var>release</var> vnet=1 dhcp=1 bpf=1 boot=1
+iocage fstab -a minim /mnt/pool/music /media nullfs ro 0 0</code></pre>
+<p>Here <var>release</var> is a FreeBSD release your system offers, such as <code>13.1-RELEASE</code>; see the note above about packages on 13.x. The second line makes your music folder visible in the jail as <code>/media</code>, read-only. Change <code>/mnt/pool/music</code> to where your music is. The commands in the rest of this page are run inside the jail, as root: <code>iocage console minim</code>.</p>
+
+<h2 id="install">Installing</h2>
+<ol class="steps">
+<li>
+<p><strong>Install Java</strong> (and ffmpeg, if you want it):</p>
+<pre><code>pkg install openjdk8-jre ffmpeg</code></pre>
+<p>Unlike earlier FreeBSD builds of ohNet, these don't need <code>lang/gcc</code>, and <code>fetch</code> replaces <code>wget</code>.</p>
+</li>
+<li>
+<p><strong>Create a user</strong> to run MinimServer, rather than running it as root:</p>
+<pre><code>pw useradd minimserver -c MinimServer -d /nonexistent -s /usr/sbin/nologin</code></pre>
+<p>It needs to be able to read your music folder. A read-only mount that everyone can read is enough.</p>
+</li>
+<li>
+<p><strong>Download MinimServer</strong> from its <a href="https://minimserver.com/downloads.html">Downloads page</a>: the Linux build for Intel, <code>MinimServer-2.2-linux-intel.tar.gz</code>. The download asks you to accept MinimServer's license terms. Copy the file into the jail, for example into <code>/tmp</code>, and unpack it:</p>
+<pre><code>tar xzf /tmp/MinimServer-2.2-linux-intel.tar.gz -C /usr/local/share
+chown -R minimserver:minimserver /usr/local/share/minimserver</code></pre>
+<p>MinimServer keeps its settings and its updates in this folder, so the user running it has to own it.</p>
+</li>
+<li>
+<p><strong>Install the service script:</strong></p>
+<pre><code>fetch -o /usr/local/etc/rc.d/minimserver \
+    https://raw.githubusercontent.com/imush/ohnet-freebsd/main/rc.d/minimserver
+chmod 555 /usr/local/etc/rc.d/minimserver
+sysrc minimserver_enable=YES minimserver_user=minimserver</code></pre>
+<p>MinimServer's own <code>bin/stopall</code> and <code>bin/startd</code> look for a running server in <code>/proc</code> or with Linux <code>ps</code> options, neither of which works on FreeBSD. This script starts MinimServer with <code>startd</code>, which also restarts it after an update, but finds and stops it by itself.</p>
+</li>
+<li>
+<p><strong>Start it once, to let it update:</strong></p>
+<pre><code>service minimserver start</code></pre>
+<p>On its first start, MinimServer updates itself to the latest version. The update brings the Linux ohNet, so after about half a minute it stops with this error in <code>/usr/local/share/minimserver/data/minimserver.log</code>:</p>
+<pre><code>java.lang.UnsatisfiedLinkError: ... Shared object "libm.so.6" not found</code></pre>
+<p>That's expected. The next step replaces it.</p>
+</li>
+<li>
+<p><strong>Replace ohNet with the FreeBSD build.</strong> See which version MinimServer wants:</p>
+<pre><code>service minimserver stop
+ls /usr/local/share/minimserver/libext/ohnet*</code></pre>
+<p>Download the zip with that name from the <a href="https://github.com/imush/ohnet-freebsd/releases">releases page</a>, saving it under MinimServer's name. For <code>ohnet(linux-intel)-1.37.5521.2.zip</code>:</p>
+<pre><code>cd /usr/local/share/minimserver/libext
+fetch -o 'ohnet(linux-intel)-1.37.5521.2.zip' \
+    https://github.com/imush/ohnet-freebsd/releases/download/v1.37.5521.2/ohnet.linux-intel.-1.37.5521.2.zip
+chown minimserver:minimserver 'ohnet(linux-intel)-1.37.5521.2.zip'
+sha256 'ohnet(linux-intel)-1.37.5521.2.zip'</code></pre>
+<p>GitHub doesn't allow parentheses in download names, so the release lists the file with dots instead. Compare the checksum with the <code>.sha256</code> file on the release page.</p>
+</li>
+<li>
+<p><strong>Start MinimServer:</strong></p>
+<pre><code>service minimserver start
+service minimserver status</code></pre>
+<p>MinimServer unpacks ohNet into <code>tmp/native/</code> as it starts. The log ends with "Startup complete".</p>
+</li>
+<li>
+<p><strong>Set it up</strong> in a browser at <code>http://<var>jail-address</var>:9790</code>. Accept the license terms, then choose your music folder: <code>/media</code> with the mount above. MinimServer scans it, and then appears in any UPnP control point on your network.</p>
+</li>
+</ol>
+
+<h2 id="updates">After MinimServer updates</h2>
+<p>MinimServer updates itself, and most updates leave ohNet alone: an update that keeps the same ohNet version keeps your FreeBSD zip. For example, going from update 272 to 275 kept it.</p>
+<p>When an update moves to a new ohNet version, MinimServer downloads that version's Linux zip and fails with the <code>libm.so.6</code> error above. A FreeBSD zip under the new name will be on the <a href="https://github.com/imush/ohnet-freebsd/releases">releases page</a>. Install it as in step 6. If you'd rather choose when to update, turn off automatic updates in MinimServer's settings.</p>
+
+<h2 id="existing">Moving an existing install to these builds</h2>
+<p>If you followed the earlier tutorial in the <a href="https://forum.minimserver.com/showthread.php?tid=2891">MinimServer forum</a>:</p>
+<ol class="steps">
+<li>
+<p>Replace <code>/etc/rc.d/minimserver</code> with the new script, so stopping works without patching <code>stopall</code> after each update:</p>
+<pre><code>service minimserver stop
+pgrep -f mserver.jar &amp;&amp; echo "still running: stop it first"
+rm /etc/rc.d/minimserver
+fetch -o /usr/local/etc/rc.d/minimserver \
+    https://raw.githubusercontent.com/imush/ohnet-freebsd/main/rc.d/minimserver
+chmod 555 /usr/local/etc/rc.d/minimserver</code></pre>
+<p>If the old <code>stop</code> didn't stop it (the <code>pgrep</code> line prints a number), MinimServer's update replaced the patched <code>stopall</code>. Stop it with <code>kill</code> on that number, then carry on. The new script runs MinimServer as root, as before, unless you set <code>minimserver_user</code>.</p>
+</li>
+<li>
+<p>Keep a copy of your current zip, then replace it as in <a href="#install">step 6</a>:</p>
+<pre><code>mkdir -p /root/ohnet-backup
+cp -p /usr/local/share/minimserver/libext/ohnet*.zip /root/ohnet-backup/</code></pre>
+</li>
+<li>
+<p>Start MinimServer with <code>service minimserver start</code>.</p>
+</li>
+</ol>
+<p>The new zips don't use <code>lang/gcc</code>. You can remove it if nothing else in the jail needs it.</p>
+
+<h2 id="trouble">Troubleshooting</h2>
+<h3><code>Shared object "libm.so.6" not found</code></h3>
+<p>MinimServer is using a Linux ohNet. This happens after an update brings a new one, or if the FreeBSD zip was saved under the wrong name. Check that the name in <code>libext/</code> is exactly MinimServer's, then see <a href="#install">step 6</a>.</p>
+<h3><code>Unable to create symbolic link /tmp/.minimserver/...</code></h3>
+<p>MinimServer was run earlier as a different user, such as root. Stop it, remove <code>/tmp/.minimserver</code> and start it again.</p>
+<h3>The server doesn't show up in control points</h3>
+<p>Check that it's running with <code>service minimserver status</code>, and look at the end of <code>data/minimserver.log</code>. Discovery uses multicast, so a jail needs VNET, and the jail and your control points must be on the same network.</p>
+<h3>Something else</h3>
+<p>Ask in the <a href="https://forum.minimserver.com/showthread.php?tid=2891">FreeBSD thread</a> of the MinimServer forum, or open an <a href="https://github.com/imush/ohnet-freebsd/issues">issue on GitHub</a>.</p>
+
+<footer>
+<p>For years, airflow made FreeBSD builds of ohNet and wrote the original <a href="https://forum.minimserver.com/showthread.php?tid=2891">tutorial</a>; this page follows it. The service script grew from the one posted in that thread in 2020. MinimServer is Simon Nash's, and this project is not part of it. ohNet is OpenHome's, under the MIT license.</p>
+</footer>
+
+</main>
+</body>
+</html>

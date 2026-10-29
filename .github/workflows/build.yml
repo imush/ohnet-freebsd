@@ -66,8 +66,45 @@ jobs:
         with:
           name: drop-in
           path: dist/
-      - if: startsWith(github.ref, 'refs/tags/v')
-        env:
+
+  # The zips are built on 13.2 and tested there by hand; check that they
+  # also load and work on the releases that still have Java packages.
+  test:
+    needs: package
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { release: "14", java: openjdk8-jre }
+          - { release: "15", java: openjdk8-jre }
+          - { release: "15", java: openjdk21 }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: drop-in
+          path: dist/
+      - uses: vmactions/freebsd-vm@v1
+        with:
+          release: ${{ matrix.release }}
+          usesh: true
+          prepare: pkg install -y ${{ matrix.java }}
+          run: |
+            java=$(ls /usr/local/openjdk*/bin/java | head -1)
+            for z in dist/*.zip; do sh scripts/selftest.sh "$z" "$java"; done
+
+  release:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: drop-in
+          path: dist/
+      - env:
           GH_TOKEN: ${{ github.token }}
         run: |
           v=${GITHUB_REF_NAME#v}

@@ -1,0 +1,88 @@
+#!/bin/sh
+#
+# PROVIDE: minimserver
+# REQUIRE: LOGIN NETWORKING
+# KEYWORD: shutdown
+#
+# Add to /etc/rc.conf (or with sysrc):
+#   minimserver_enable="YES"
+# Optional:
+#   minimserver_dir="/usr/local/share/minimserver"   where it is installed
+#   minimserver_user="root"                          who runs it; that user
+#                                                    must own minimserver_dir
+#   minimserver_lang="en_US.UTF-8"                   locale for file names
+#
+# MinimServer's own start script, bin/startd, is used to start it, because it
+# relaunches MinimServer after an update. It and bin/stopall look for the
+# server in /proc, which FreeBSD (and its jails) doesn't mount, so stopping
+# finds the Java process itself.
+
+. /etc/rc.subr
+
+name=minimserver
+rcvar=minimserver_enable
+load_rc_config $name
+
+: ${minimserver_enable:="NO"}
+: ${minimserver_dir:="/usr/local/share/minimserver"}
+: ${minimserver_user:="root"}
+: ${minimserver_lang:="en_US.UTF-8"}
+
+start_cmd="${name}_start"
+stop_cmd="${name}_stop"
+status_cmd="${name}_status"
+extra_commands="status"
+
+minimserver_pids()
+{
+	pgrep -f -- "-jar ${minimserver_dir}/lib/mserver.jar"
+}
+
+minimserver_start()
+{
+	if pids=$(minimserver_pids); then
+		echo "${name} is already running as pid" $pids.
+		return 0
+	fi
+	echo "Starting ${name}."
+	# A fresh install has no data directory until its first run.
+	[ -d "${minimserver_dir}/data" ] ||
+	    install -d -o "${minimserver_user}" "${minimserver_dir}/data"
+	env -i HOME=/nonexistent PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin \
+	    LANG="${minimserver_lang}" LC_ALL="${minimserver_lang}" \
+	    /usr/bin/su -m "${minimserver_user}" -c "${minimserver_dir}/bin/startd" \
+	    </dev/null >/dev/null 2>&1
+}
+
+minimserver_stop()
+{
+	if ! pids=$(minimserver_pids); then
+		echo "${name} is not running."
+		return 0
+	fi
+	echo "Stopping ${name}."
+	kill $pids
+	n=0
+	while pids=$(minimserver_pids); do
+		if [ $n -ge 20 ]; then
+			echo "Forcibly stopping ${name}."
+			kill -9 $pids
+			break
+		fi
+		sleep 1
+		n=$((n + 1))
+	done
+	wait_for_pids $pids
+}
+
+minimserver_status()
+{
+	if pids=$(minimserver_pids); then
+		echo "${name} is running as pid" $pids.
+	else
+		echo "${name} is not running."
+		return 1
+	fi
+}
+
+run_rc_command "$1"
