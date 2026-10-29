@@ -1,0 +1,39 @@
+diff --git a/Os/Posix/Os.c b/Os/Posix/Os.c
+index 5815444..6505149 100644
+--- a/Os/Posix/Os.c
++++ b/Os/Posix/Os.c
+@@ -37,6 +37,16 @@
+ #include <ifaddrs.h>
+ #include <signal.h>
+ 
++#ifdef PLATFORM_FREEBSD
++/* FreeBSD names these after RFC 3493. */
++# ifndef IPV6_ADD_MEMBERSHIP
++#  define IPV6_ADD_MEMBERSHIP IPV6_JOIN_GROUP
++# endif
++# ifndef IPV6_DROP_MEMBERSHIP
++#  define IPV6_DROP_MEMBERSHIP IPV6_LEAVE_GROUP
++# endif
++#endif /* PLATFORM_FREEBSD */
++
+ #ifdef PLATFORM_MACOSX_GNU
+ #include <SystemConfiguration/SystemConfiguration.h>
+ #include <execinfo.h>
+@@ -1835,7 +1845,7 @@ int32_t OsNetworkSocketSetMulticastIf(THandle aHandle, TIpAddress aInterface)
+ 
+ static int IsWireless(const char* ifname, int domain)
+ {
+-#if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_QNAP)
++#if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_QNAP) && !defined(PLATFORM_FREEBSD)
+     int sock = -1;
+     int err;
+     struct iwreq pwrq;
+@@ -1851,7 +1861,7 @@ static int IsWireless(const char* ifname, int domain)
+     return err == 0 ? 1 : 0;
+ #else
+     return 0;
+-#endif /* !PLATFORM_MACOSX_GNU && !PLATFORM_QNAP */
++#endif /* !PLATFORM_MACOSX_GNU && !PLATFORM_QNAP && !PLATFORM_FREEBSD */
+ }
+ 
+ static void append(OsNetworkAdapter* aAdapter, OsNetworkAdapter** aHead, OsNetworkAdapter** aTail)
