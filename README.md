@@ -55,10 +55,14 @@ inside the jail.
 
        cd /usr/local/share/minimserver/libext
        mkdir -p /root/ohnet-backup && cp -p ohnet*.zip /root/ohnet-backup/
-       fetch 'https://github.com/imush/ohnet-freebsd/releases/download/v1.37.5521.2/ohnet(linux-intel)-1.37.5521.2.zip'
+       fetch -o 'ohnet(linux-intel)-1.37.5521.2.zip' \
+           https://github.com/imush/ohnet-freebsd/releases/download/v1.37.5521.2/ohnet.linux-intel.-1.37.5521.2.zip
        sha256 'ohnet(linux-intel)-1.37.5521.2.zip'
 
-   Compare the checksum with the `.sha256` file on the release page.
+   GitHub doesn't allow parentheses in download names, so the release
+   lists the zip as `ohnet.linux-intel.-1.37.5521.2.zip`; `-o` saves it under
+   the name MinimServer looks for. Compare the checksum with the `.sha256`
+   file on the release page.
 
 4. Start MinimServer:
 
