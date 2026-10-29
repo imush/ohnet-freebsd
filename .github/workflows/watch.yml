@@ -1,0 +1,68 @@
+name: watch
+
+# Weekly, so the patch keeps up without anyone remembering to check:
+# - builds the newest upstream ohNet release with patches/ on FreeBSD and
+#   runs the self-test, opening an issue if that fails;
+# - opens an issue when MinimServer releases an update newer than the one
+#   in watch/minimserver-update, so someone checks whether it changed ohNet.
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: tag
+        run: |
+          v=$(git ls-remote --tags https://github.com/openhome/ohNet.git 'ohNet_*' |
+              sed -n 's|.*refs/tags/ohNet_\([0-9.]*\)$|\1|p' | sort -V | tail -1)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "newest upstream ohNet: $v"
+      - uses: vmactions/freebsd-vm@v1
+        with:
+          release: "14"
+          usesh: true
+          prepare: pkg install -y openjdk8 curl zip
+          run: |
+            v=${{ steps.tag.outputs.version }}
+            sh scripts/build-native.sh "$v" "build/$v"
+            JAVA_HOME=/usr/local/openjdk8 sh scripts/build-jar.sh "$v" "build/$v"
+            sh scripts/package.sh "$v" "build/$v" dist
+            sh scripts/selftest.sh "dist/ohnet(linux-intel)-$v.zip" /usr/local/openjdk8/bin/java
+      - if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.tag.outputs.version }}
+        run: |
+          title="ohNet $V doesn't build or pass the self-test with patches/"
+          gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[].number' | grep -q . ||
+            gh issue create --title "$title" --body "The weekly check failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+          Update patches/ for ohNet $V before MinimServer moves to it."
+
+  minimserver:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest=$(curl -sSfL https://minimserver.com/relnotes.html |
+              grep -o 'MinimServer update [0-9]* released' | head -1 | grep -o '[0-9][0-9]*')
+          known=$(cat watch/minimserver-update)
+          echo "MinimServer: latest update $latest, last checked $known"
+          [ -n "$latest" ] || { echo "couldn't read the latest update from the release notes"; exit 1; }
+          [ "$latest" -gt "$known" ] || exit 0
+          title="MinimServer update $latest: check its ohNet version"
+          gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[].number' | grep -q . ||
+            gh issue create --title "$title" --body "MinimServer update $latest is out (last checked: $known).
+
+          Install it on a test copy and look in libext/ for the ohnet zip's name. If the version changed, add it to VERSIONS and tag a release.
+          Then set watch/minimserver-update to $latest."

@@ -108,6 +108,22 @@ To build one yourself on FreeBSD:
     sh scripts/build-jar.sh 1.37.5521 build/1.37.5521     # anywhere with JDK 8
     sh scripts/package.sh 1.37.5521.2 build/1.37.5521 dist
 
+## Keeping up
+
+The FreeBSD fix is offered upstream as
+[openhome/ohNet#44](https://github.com/openhome/ohNet/pull/44). Upstream
+rarely merges outside pull requests, so this repository keeps it in
+`patches/`. Once a week, the `watch` workflow:
+
+- builds the newest upstream ohNet release with the patch and runs the
+  self-test on FreeBSD 14, and opens an issue if either fails;
+- opens an issue when MinimServer releases an update newer than the one
+  in `watch/minimserver-update`. An update may move to a new ohNet, so
+  someone has to check the zip name it installs.
+
+When MinimServer moves to a new ohNet version, add a line to `VERSIONS`
+and push a tag `vZIP_VERSION` to publish the zip.
+
 ## License
 
 The scripts and patches are under the BSD 3-Clause License (`LICENSE`).
