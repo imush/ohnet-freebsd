@@ -57,7 +57,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 0.9rem; }
 <li><a href="#need">What you need</a></li>
 <li><a href="#jail">A jail for MinimServer</a></li>
 <li><a href="#install">Installing</a></li>
-<li><a href="#updates">After MinimServer updates</a></li>
+<li><a href="#updates">Upgrading</a></li>
 <li><a href="#existing">Moving an existing install to these builds</a></li>
 <li><a href="#trouble">Troubleshooting</a></li>
 </ol>
@@ -133,9 +133,50 @@ service minimserver status</code></pre>
 </li>
 </ol>
 
-<h2 id="updates">After MinimServer updates</h2>
-<p>MinimServer updates itself, and most updates leave ohNet alone: an update that keeps the same ohNet version keeps your FreeBSD zip. For example, going from update 272 to 275 kept it.</p>
-<p>When an update moves to a new ohNet version, MinimServer downloads that version's Linux zip and fails with the <code>libm.so.6</code> error above. A FreeBSD zip under the new name will be on the <a href="https://github.com/imush/ohnet-freebsd/releases">releases page</a>. Install it as in step 6. If you'd rather choose when to update, turn off automatic updates in MinimServer's settings.</p>
+<h2 id="updates">Upgrading</h2>
+
+<h3>MinimServer updates</h3>
+<p>MinimServer updates itself as it starts, unless automatic updates are turned off in its settings. You can also update it from its web page at <code>http://<var>jail-address</var>:9790</code>. When an update is available, the page offers it with an Install button, and MinimServer restarts itself afterwards.</p>
+<p>Most updates leave ohNet alone. An update that keeps the same ohNet version keeps your FreeBSD zip: for example, going from update 272 to 275 kept it. An update that moves to a new ohNet version brings that version's Linux zip, and MinimServer then fails to start with the <code>libm.so.6</code> error. To update safely:</p>
+<ol class="steps">
+<li>
+<p><strong>Before updating,</strong> look in MinimServer's <a href="https://minimserver.com/relnotes.html">release notes</a> for a line like "Update ohNet to version …" in any update newer than yours. If there is one, check that the <a href="https://github.com/imush/ohnet-freebsd/releases">releases page</a> has a FreeBSD zip for that version. If there isn't one yet, wait to update, or open an <a href="https://github.com/imush/ohnet-freebsd/issues">issue</a>.</p>
+</li>
+<li>
+<p><strong>Keep a copy</strong> of the current zip, in case you need to go back:</p>
+<pre><code>mkdir -p /root/ohnet-backup
+cp -p /usr/local/share/minimserver/libext/ohnet*.zip /root/ohnet-backup/</code></pre>
+</li>
+<li>
+<p><strong>Install the update</strong> from the web page, or with <code>service minimserver restart</code> if automatic updates are on.</p>
+</li>
+<li>
+<p><strong>Check which ohNet MinimServer has now:</strong></p>
+<pre><code>cd /usr/local/share/minimserver/libext
+for z in ohnet*.zip; do echo "$z"; unzip -p "$z" libohNet.so.64 | file -; done</code></pre>
+<p>A FreeBSD zip shows <code>(FreeBSD)</code>. If it shows <code>(SYSV)</code>, it's the Linux zip: replace it with the FreeBSD zip of the same name, as in <a href="#install">step 6</a>, and start MinimServer again.</p>
+</li>
+</ol>
+
+<h3>A new build of the same ohNet version</h3>
+<p>A new release here with the same zip name, such as a fixed build, is installed the same way: stop MinimServer, replace the zip, and start it.</p>
+
+<h3>The service script</h3>
+<p>To get the latest version of the service script:</p>
+<pre><code>fetch -o /usr/local/etc/rc.d/minimserver \
+    https://raw.githubusercontent.com/imush/ohnet-freebsd/main/rc.d/minimserver
+service minimserver restart</code></pre>
+<p>Your settings in <code>/etc/rc.conf</code> carry over.</p>
+
+<h3>Java and FreeBSD</h3>
+<p>On FreeBSD 14 and later, Java updates with the rest of the jail's packages: <code>pkg upgrade</code>, then <code>service minimserver restart</code>. The zips are built on FreeBSD 13.2 and work on later releases: they're tested on 13.1, 14 and 15, with OpenJDK 8 and 21. So upgrading the jail to a newer FreeBSD needs no new zip.</p>
+
+<h3>Going back</h3>
+<p>To return to the zip you saved before an update:</p>
+<pre><code>service minimserver stop
+cp -p /root/ohnet-backup/ohnet*.zip /usr/local/share/minimserver/libext/
+service minimserver start</code></pre>
+<p>This puts back the zip, not the MinimServer version. An ohNet zip works only with the MinimServer updates that use that ohNet version.</p>
 
 <h2 id="existing">Moving an existing install to these builds</h2>
 <p>If you followed the earlier tutorial in the <a href="https://forum.minimserver.com/showthread.php?tid=2891">MinimServer forum</a>:</p>
@@ -163,7 +204,7 @@ cp -p /usr/local/share/minimserver/libext/ohnet*.zip /root/ohnet-backup/</code><
 
 <h2 id="trouble">Troubleshooting</h2>
 <h3><code>Shared object "libm.so.6" not found</code></h3>
-<p>MinimServer is using a Linux ohNet. This happens after an update brings a new one, or if the FreeBSD zip was saved under the wrong name. Check that the name in <code>libext/</code> is exactly MinimServer's, then see <a href="#install">step 6</a>.</p>
+<p>MinimServer is using a Linux ohNet. This happens after an update brings a new one, or if the FreeBSD zip was saved under the wrong name. <a href="#updates">Check which zip it has</a>, and that its name in <code>libext/</code> is exactly MinimServer's, then see <a href="#install">step 6</a>.</p>
 <h3><code>Unable to create symbolic link /tmp/.minimserver/...</code></h3>
 <p>MinimServer was run earlier as a different user, such as root. Stop it, remove <code>/tmp/.minimserver</code> and start it again.</p>
 <h3>The server doesn't show up in control points</h3>
