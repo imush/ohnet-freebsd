@@ -107,7 +107,11 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          v=${GITHUB_REF_NAME#v}
-          gh release create "$GITHUB_REF_NAME" --title "ohNet for MinimServer $v (FreeBSD amd64)" \
+          # vZIP_VERSION, or vZIP_VERSION-N for a rebuild of the same zip.
+          tag=${GITHUB_REF_NAME#v}
+          v=${tag%%-*}
+          title="ohNet for MinimServer $v (FreeBSD amd64)"
+          [ "$tag" = "$v" ] || title="$title, rebuild ${tag#*-}"
+          gh release create "$GITHUB_REF_NAME" --title "$title" \
             --notes "Drop-in ohNet for MinimServer on FreeBSD. See the README for how to install it." \
             "dist/ohnet(linux-intel)-$v.zip" "dist/ohnet(linux-intel)-$v.zip.sha256"

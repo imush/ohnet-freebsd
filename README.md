@@ -25,7 +25,7 @@ name from [Releases](../../releases).
 
 | MinimServer | Zip | ohNet |
 |---|---|---|
-| 2.2, update 255 and later | `ohnet(linux-intel)-1.37.5521.2.zip` | 1.37.5521 |
+| 2.2, update 255 and later | `ohnet(linux-intel)-1.37.5521.2.zip` | 1.37.5521.2, MinimServer's own build of 1.37.5521 |
 
 These zips are for FreeBSD 13.1 or later on amd64, including TrueNAS CORE
 jails. They need no packages beyond the Java that MinimServer already uses:
@@ -61,7 +61,7 @@ inside the jail.
        cd /usr/local/share/minimserver/libext
        mkdir -p /root/ohnet-backup && cp -p ohnet*.zip /root/ohnet-backup/
        fetch -o 'ohnet(linux-intel)-1.37.5521.2.zip' \
-           https://github.com/imush/ohnet-freebsd/releases/download/v1.37.5521.2/ohnet.linux-intel.-1.37.5521.2.zip
+           https://github.com/imush/ohnet-freebsd/releases/download/v1.37.5521.2-2/ohnet.linux-intel.-1.37.5521.2.zip
        sha256 'ohnet(linux-intel)-1.37.5521.2.zip'
 
    GitHub doesn't allow parentheses in download names, so the release
@@ -90,23 +90,28 @@ after checking here.
 ## How it's built
 
 - `scripts/build-native.sh` runs on FreeBSD. It builds `libohNet.so` and
-  `libohNetJni.so` from the
-  [upstream ohNet](https://github.com/openhome/ohNet) release with the base
-  system compiler, plus two small fixes in `patches/`: FreeBSD's names for
-  the IPv6 multicast options, and the Wi-Fi check, which is Linux-only.
+  `libohNetJni.so` with the base system compiler from the same ohNet source
+  as MinimServer's own zip, plus two small fixes in `patches/`: FreeBSD's
+  names for the IPv6 multicast options, and the Wi-Fi check, which is
+  Linux-only. The source is the [upstream ohNet](https://github.com/openhome/ohNet)
+  release, unless MinimServer ships its own build of it: then a file in
+  `sources/` names MinimServer's source tarball and its SHA-256.
+  1.37.5521.2 is such a build, with fixes for UTF-8 strings between Java
+  and native code that aren't upstream.
 - `scripts/build-jar.sh` builds `ohnet.jar` from the same source with JDK 8.
 - `scripts/package.sh` packs them under MinimServer's name. Both the `.32`
   and `.64` names hold the same 64-bit library. `LICENSE.txt` and
   `module.properties` are as in MinimServer's own zip.
 
 GitHub Actions builds every version in `VERSIONS` on FreeBSD 13.2. A tag
-`vZIP_VERSION` publishes that zip as a release.
+`vZIP_VERSION` publishes that zip as a release; a rebuild of the same zip
+is tagged `vZIP_VERSION-2`, `-3` and so on.
 
 To build one yourself on FreeBSD:
 
-    sh scripts/build-native.sh 1.37.5521 build/1.37.5521
-    sh scripts/build-jar.sh 1.37.5521 build/1.37.5521     # anywhere with JDK 8
-    sh scripts/package.sh 1.37.5521.2 build/1.37.5521 dist
+    sh scripts/build-native.sh 1.37.5521.2 build/1.37.5521.2
+    sh scripts/build-jar.sh 1.37.5521.2 build/1.37.5521.2     # anywhere with JDK 8
+    sh scripts/package.sh 1.37.5521.2 build/1.37.5521.2 dist
 
 ## Keeping up
 
@@ -122,7 +127,10 @@ rarely merges outside pull requests, so this repository keeps it in
   someone has to check the zip name it installs.
 
 When MinimServer moves to a new ohNet version, add a line to `VERSIONS`
-and push a tag `vZIP_VERSION` to publish the zip.
+and push a tag `vZIP_VERSION` to publish the zip. If MinimServer's zip is
+built from its own source rather than an upstream release (its version
+has a fifth number, like 1.37.5521.2), add the source tarball to
+`sources/`; Simon Nash publishes it on request.
 
 ## License
 

@@ -1,5 +1,6 @@
 #!/bin/sh
-# Builds ohnet.jar, the Java side of ohNet, from the same upstream source.
+# Builds ohnet.jar, the Java side of ohNet, from the same source as
+# build-native.sh.
 # It is plain Java, the same on every platform.
 #
 # Usage: build-jar.sh OHNET_VERSION OUTDIR
@@ -10,6 +11,7 @@ set -eu
 
 [ $# -eq 2 ] || { echo "usage: $0 OHNET_VERSION OUTDIR" >&2; exit 2; }
 version=$1
+repo=$(cd "$(dirname "$0")/.." && pwd)
 mkdir -p "$2"
 out=$(cd "$2" && pwd)
 work=${WORK:-/tmp/ohnet-freebsd}/jar-$version
@@ -17,7 +19,7 @@ java_home=${JAVA_HOME:-$(dirname "$(dirname "$(command -v javac)")")}
 
 rm -rf "$work"
 mkdir -p "$work/classes"
-curl -sSfL "https://github.com/openhome/ohNet/archive/refs/tags/ohNet_$version.tar.gz" | tar xzf - -C "$work"
+sh "$repo/scripts/fetch-source.sh" "$version" "$work"
 src=$work/ohNet-ohNet_$version
 
 # The classes upstream puts in ohnet.jar, as listed in Common.mak.

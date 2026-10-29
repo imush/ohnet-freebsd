@@ -5,6 +5,8 @@
 #
 # Usage: build-native.sh OHNET_VERSION OUTDIR
 #   e.g. build-native.sh 1.37.5521 out/1.37.5521
+# The source is the upstream release, or the tarball sources/OHNET_VERSION
+# names (see fetch-source.sh).
 #
 # Needs only a FreeBSD base system and network access. GNU make is used
 # from PATH as gmake if there, or else built from source.
@@ -67,18 +69,19 @@ export PATH="$tools/bin:$PATH"
 
 # ohNet source, with the FreeBSD patches.
 src=$work/ohNet-ohNet_$version
-rm -rf "$src"
-fetch -q -o "$work/ohNet-$version.tar.gz" \
-    "https://github.com/openhome/ohNet/archive/refs/tags/ohNet_$version.tar.gz"
-tar xzf "$work/ohNet-$version.tar.gz" -C "$work"
+sh "$repo/scripts/fetch-source.sh" "$version" "$work"
 for p in "$repo"/patches/*.patch; do
     patch -s -p1 -d "$src" < "$p"
 done
 
+# Warnings clang raises in the JNI glue, which builds with -Werror: the
+# bindings assign arguments to themselves, and MinimServer's 1.37.5521.2
+# passes a const char ** where the C API takes char **.
+java_cflags="-Wno-self-assign -Wno-incompatible-pointer-types-discards-qualifiers"
 mk() {
     (cd "$src" && "$gmake" freebsd=1 rsync=no cp=cp JAVA_HOME="$jdk" \
         includes_jni="-I$jdk/include -I$jdk/include/freebsd" link_jvm= \
-        platform_java_cflags=-Wno-self-assign "$@")
+        platform_java_cflags="$java_cflags" "$@")
 }
 # Copying the headers is not safe to run in parallel with compiling.
 mk make_obj_dir copy_build_includes patch_thirdparty_sources
