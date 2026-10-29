@@ -22,10 +22,11 @@ name from [Releases](../../releases).
 |---|---|---|
 | 2.2, update 255 and later | `ohnet(linux-intel)-1.37.5521.2.zip` | 1.37.5521 |
 
-These zips need FreeBSD 13.2 or later on amd64, including TrueNAS CORE
+These zips are for FreeBSD 13.1 or later on amd64, including TrueNAS CORE
 jails. They need no packages beyond the Java that MinimServer already uses:
 unlike earlier builds, they don't need `lang/gcc`. They're tested on FreeBSD
-13.1 with OpenJDK 8, MinimServer 2.2 updates 272 and 275.
+13.1 (a TrueNAS CORE jail) with OpenJDK 8, MinimServer 2.2 updates 272 and
+275.
 
 ## Installing
 
